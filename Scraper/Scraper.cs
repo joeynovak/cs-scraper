@@ -64,10 +64,49 @@ namespace JoeyNovak.Scraper
             return task.Result;
         }
 
-        public async Task<WebPage> PostWebPageAsync(string url, Dictionary<string, string> data)
+        public WebPage PostWebPage(string url, string postBody, string contentType = null)
+        {
+            Task<WebPage> task = null;
+            task = PostWebPageAsync(url, postBody, contentType);
+
+            task.Wait();
+
+            return task.Result;
+        }
+
+        public WebPage PostWebPage(string url, Dictionary<string, string> data, string contentType = null)
+        {
+            Task<WebPage> task = null;
+            task = PostWebPageAsync(url, data, contentType);
+
+            task.Wait();
+
+            return task.Result;
+        }
+
+        public async Task<WebPage> PostWebPageAsync(string url, string postBody, string contentType = null)
+        {
+            HttpRequestMessage httpRequestMessage = new HttpRequestMessage(HttpMethod.Post, new Uri(url));
+            httpRequestMessage.Content = new StringContent(postBody);
+            if (contentType != null)
+                httpRequestMessage.Headers.TryAddWithoutValidation("Content-Type", contentType);
+
+            ImpersonateChrome(httpRequestMessage);
+            HttpResponseMessage httpResponseMessage = await _httpClient.SendAsync(httpRequestMessage);
+
+            WebPage webPage = new WebPage(httpResponseMessage);
+            webPage.Body = await httpResponseMessage.Content.ReadAsStringAsync();
+
+            return webPage;
+        }
+
+        public async Task<WebPage> PostWebPageAsync(string url, Dictionary<string, string> data, string contentType = null)
         {
             HttpRequestMessage httpRequestMessage = new HttpRequestMessage(HttpMethod.Post, new Uri(url));
             httpRequestMessage.Content = new FormUrlEncodedContent(data);
+
+            if (contentType != null)
+                httpRequestMessage.Headers.TryAddWithoutValidation("Content-Type", contentType);
 
             ImpersonateChrome(httpRequestMessage);            
             HttpResponseMessage httpResponseMessage = await _httpClient.SendAsync(httpRequestMessage);
