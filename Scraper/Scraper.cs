@@ -16,6 +16,8 @@ namespace JoeyNovak.Scraper
         private HttpClient _httpClient = null;
         private CookieContainer _cookieContainer = new CookieContainer();
 
+        public delegate void RequestModifier(HttpRequestMessage requestMessage);
+
         public CsScraper()
         {
             _httpClient = new HttpClient(
@@ -64,34 +66,36 @@ namespace JoeyNovak.Scraper
             return task.Result;
         }
 
-        public WebPage PostWebPage(string url, string postBody, string contentType = null)
+        public WebPage PostWebPage(string url, string postBody, string mediaType = null, Encoding encoding = null, RequestModifier modifier = null)
         {
             Task<WebPage> task = null;
-            task = PostWebPageAsync(url, postBody, contentType);
+            task = PostWebPageAsync(url, postBody, mediaType, encoding, modifier);
 
             task.Wait();
 
             return task.Result;
         }
 
-        public WebPage PostWebPage(string url, Dictionary<string, string> data, string contentType = null)
+        public WebPage PostWebPage<T>(string url, Dictionary<string, string> data, RequestModifier requestModifier = null)
         {
             Task<WebPage> task = null;
-            task = PostWebPageAsync(url, data, contentType);
+            task = PostWebPageAsync(url, data, requestModifier);
 
             task.Wait();
 
             return task.Result;
         }
 
-        public async Task<WebPage> PostWebPageAsync(string url, string postBody, string contentType = null)
+        public async Task<WebPage> PostWebPageAsync(string url, string postBody, string mediaType = null, Encoding encoding = null, RequestModifier requestModifier = null)
         {
             HttpRequestMessage httpRequestMessage = new HttpRequestMessage(HttpMethod.Post, new Uri(url));
-            httpRequestMessage.Content = new StringContent(postBody);
-            if (contentType != null)
-                httpRequestMessage.Headers.TryAddWithoutValidation("Content-Type", contentType);
+            httpRequestMessage.Content = new StringContent(postBody, encoding, mediaType);            
 
             ImpersonateChrome(httpRequestMessage);
+
+            if (requestModifier != null)
+                requestModifier(httpRequestMessage);
+
             HttpResponseMessage httpResponseMessage = await _httpClient.SendAsync(httpRequestMessage);
 
             WebPage webPage = new WebPage(httpResponseMessage);
@@ -100,15 +104,13 @@ namespace JoeyNovak.Scraper
             return webPage;
         }
 
-        public async Task<WebPage> PostWebPageAsync(string url, Dictionary<string, string> data, string contentType = null)
+        public async Task<WebPage> PostWebPageAsync(string url, Dictionary<string, string> data, RequestModifier requestModifier)
         {
             HttpRequestMessage httpRequestMessage = new HttpRequestMessage(HttpMethod.Post, new Uri(url));
-            httpRequestMessage.Content = new FormUrlEncodedContent(data);
+            httpRequestMessage.Content = new FormUrlEncodedContent(data);                        
 
-            if (contentType != null)
-                httpRequestMessage.Headers.TryAddWithoutValidation("Content-Type", contentType);
-
-            ImpersonateChrome(httpRequestMessage);            
+            ImpersonateChrome(httpRequestMessage);          
+            requestModifier?.Invoke(httpRequestMessage);  
             HttpResponseMessage httpResponseMessage = await _httpClient.SendAsync(httpRequestMessage);
 
             WebPage webPage = new WebPage(httpResponseMessage);
